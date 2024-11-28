@@ -82,7 +82,7 @@ def upload_to_blob(file_data, filename):
             container_client.create_container()
 
         # Create blob name
-        blob_name = f"image_{filename}"
+        blob_name = f"{filename}"
         logger.info(f"Uploading blob: {blob_name}")
 
         # Get blob client
