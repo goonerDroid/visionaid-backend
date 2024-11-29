@@ -4,7 +4,7 @@ from azure.storage.blob import BlobServiceClient
 from azure.ai.vision.imageanalysis import ImageAnalysisClient
 from azure.ai.vision.imageanalysis.models import VisualFeatures
 from azure.core.credentials import AzureKeyCredential
-from models import ImageAnalysisResponse, DetectedObject, Tag
+from models import ImageAnalysisResponse, DenseCaption
 import os
 from dotenv import load_dotenv
 from pydantic import BaseModel
@@ -128,38 +128,32 @@ async def analyze_image(file: UploadFile = File(...)):
             result = vision_client.analyze(
                 image_data=image_data,
                 visual_features=[
-                    VisualFeatures.TAGS,
-                    VisualFeatures.OBJECTS,
                     VisualFeatures.CAPTION,
-                    VisualFeatures.READ,
-                    VisualFeatures.SMART_CROPS,
-                    VisualFeatures.PEOPLE
+                    VisualFeatures.DENSE_CAPTIONS,
+                    VisualFeatures.READ
                 ]
             )
+
+            # Process dense captions and sort by confidence
+            dense_captions = []
+            if result.dense_captions:
+                dense_captions = [
+                    DenseCaption(
+                        text=caption.text,
+                        confidence=caption.confidence
+                    ) for caption in result.dense_captions.list
+                ]
+                # Sort by confidence in descending order
+                dense_captions.sort(
+                    key=lambda x: x.confidence or 0, reverse=True)
 
             # Process results
             response = ImageAnalysisResponse(
                 caption=result.caption.text if result.caption else None,
+                dense_captions=dense_captions,  # This will now be sorted by confidence
                 text_content=" ".join(
-                    [line.text for block in result.read.blocks for line in block.lines]) if result.read else None,
-                tags=[
-                    Tag(
-                        name=tag.name,
-                        confidence=tag.confidence
-                    ) for tag in result.tags.list
-                ] if result.tags else [],
-                objects=[
-                    DetectedObject(
-                        name=obj.tags[0].name,
-                        confidence=obj.tags[0].confidence,
-                        bounding_box={
-                            'x': obj.bounding_box.x,
-                            'y': obj.bounding_box.y,
-                            'width': obj.bounding_box.width,
-                            'height': obj.bounding_box.height
-                        } if obj.bounding_box else None
-                    ) for obj in result.objects.list
-                ] if result.objects else []
+                    [line.text for block in result.read.blocks for line in block.lines]
+                ) if result.read else None
             )
 
             return response
