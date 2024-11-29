@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 from typing import Optional, List
 import logging
+from caption_enhance import CaptionEnhance
+
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -19,6 +21,8 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 app = FastAPI()
+
+caption_enhance = CaptionEnhance()
 
 # Add CORS middleware
 app.add_middleware(
@@ -148,15 +152,29 @@ async def analyze_image(file: UploadFile = File(...)):
                     key=lambda x: x.confidence or 0, reverse=True)
 
             # Process results
-            response = ImageAnalysisResponse(
-                caption=result.caption.text if result.caption else None,
-                dense_captions=dense_captions,  # This will now be sorted by confidence
-                text_content=" ".join(
-                    [line.text for block in result.read.blocks for line in block.lines]
-                ) if result.read else None
-            )
+                response = ImageAnalysisResponse(
+                    caption=result.caption.text if result.caption else None,
+                    dense_captions=[
+                        DenseCaption(
+                            text=caption.text,
+                            confidence=caption.confidence
+                        ) for caption in result.dense_captions.list
+                    ] if result.dense_captions else [],
+                    text_content=" ".join(
+                        [line.text for block in result.read.blocks for line in block.lines]
+                    ) if result.read else None
+                )
 
-            return response
+            # Convert to dict for enhancement
+            response_dict = response.dict()
+
+            # Enhance the response
+            enhanced_dict = caption_enhance.enhance_response(response_dict)
+
+            # Convert back to ImageAnalysisResponse
+            enhanced_response = ImageAnalysisResponse(**enhanced_dict)
+
+            return enhanced_response
 
         except Exception as vision_error:
             logger.error(f"Vision API error: {str(vision_error)}")
