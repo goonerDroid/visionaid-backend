@@ -1,17 +1,14 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from azure.storage.blob import BlobServiceClient
-from azure.ai.vision.imageanalysis import ImageAnalysisClient
-from azure.ai.vision.imageanalysis.models import VisualFeatures
-from azure.core.credentials import AzureKeyCredential
+from azure.cognitiveservices.vision.computervision import ComputerVisionClient
+from azure.cognitiveservices.vision.computervision.models import VisualFeatureTypes
 from models import ImageAnalysisResponse, DenseCaption
 import os
 from dotenv import load_dotenv
-from pydantic import BaseModel
 from typing import Optional, List
 import logging
 from caption_enhance import CaptionEnhance
-
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -48,6 +45,10 @@ if not VISION_ENDPOINT or not VISION_KEY or not STORAGE_CONNECTION_STRING:
     if not STORAGE_CONNECTION_STRING:
         error_message += "- AZURE_STORAGE_CONNECTION_STRING\n"
     raise ValueError(error_message)
+
+# Initialize the Computer Vision client
+computervision_client = ComputerVisionClient(
+    VISION_ENDPOINT, CognitiveServicesCredentials(VISION_KEY))
 
 
 @app.get("/")
@@ -120,50 +121,47 @@ async def analyze_image(file: UploadFile = File(...)):
             logger.error(f"Storage error: {str(storage_error)}")
 
         try:
-            # Initialize Vision client
-            logger.debug("Initializing Vision client")
-            vision_client = ImageAnalysisClient(
-                endpoint=VISION_ENDPOINT,
-                credential=AzureKeyCredential(VISION_KEY)
-            )
-
             # Analyze image
             logger.debug("Analyzing image")
-            result = vision_client.analyze(
-                image_data=image_data,
-                visual_features=[
-                    VisualFeatures.CAPTION,
-                    VisualFeatures.DENSE_CAPTIONS,
-                    VisualFeatures.READ
-                ]
+            features = [
+                VisualFeatureTypes.description,
+                VisualFeatureTypes.tags,
+                VisualFeatureTypes.objects,
+            ]
+
+            result = computervision_client.analyze_image_in_stream(
+                image_data,
+                visual_features=features
             )
 
-            # Process dense captions and sort by confidence
+            # Create dense captions from tags and objects
             dense_captions = []
-            if result.dense_captions:
-                dense_captions = [
-                    DenseCaption(
-                        text=caption.text,
-                        confidence=caption.confidence
-                    ) for caption in result.dense_captions.list
-                ]
-                # Sort by confidence in descending order
-                dense_captions.sort(
-                    key=lambda x: x.confidence or 0, reverse=True)
 
-            # Process results
-                response = ImageAnalysisResponse(
-                    caption=result.caption.text if result.caption else None,
-                    dense_captions=[
-                        DenseCaption(
-                            text=caption.text,
-                            confidence=caption.confidence
-                        ) for caption in result.dense_captions.list
-                    ] if result.dense_captions else [],
-                    text_content=" ".join(
-                        [line.text for block in result.read.blocks for line in block.lines]
-                    ) if result.read else None
-                )
+            # Add tags as dense captions
+            if result.tags:
+                for tag in result.tags:
+                    dense_captions.append(DenseCaption(
+                        text=f"Contains {tag.name}",
+                        confidence=tag.confidence
+                    ))
+
+            # Add objects as dense captions
+            if result.objects:
+                for obj in result.objects:
+                    dense_captions.append(DenseCaption(
+                        text=f"Found {obj.object_property}",
+                        confidence=obj.confidence
+                    ))
+
+            # Sort by confidence
+            dense_captions.sort(key=lambda x: x.confidence or 0, reverse=True)
+
+            # Create response
+            response = ImageAnalysisResponse(
+                caption=result.description.captions[0].text if result.description.captions else None,
+                dense_captions=dense_captions,
+                text_content=None  # OCR not included in this version
+            )
 
             # Convert to dict for enhancement
             response_dict = response.dict()
