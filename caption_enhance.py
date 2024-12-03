@@ -1,11 +1,7 @@
 from random import choice
 
-# The CaptionEnhance class is designed to enhance the output from Azure's Computer Vision API by adding more context and descriptive elements
-# to the generated captions. It processes both the main caption and dense captions to make them more verbose and user-friendly.
-
 
 class CaptionEnhance:
-    # List of introductory phrases for variety
     INTRO_PHRASES = [
         "In this picture we can see",
         "The image shows",
@@ -25,34 +21,28 @@ class CaptionEnhance:
     ]
 
     @staticmethod
-    def get_random_intro() -> str:
-        """Returns a random introductory phrase"""
+    def get_random_intro():
         return choice(CaptionEnhance.INTRO_PHRASES)
 
     @staticmethod
-    def clean_caption_text(text: str) -> str:
-        """Clean caption text by detecting and removing repetitive patterns"""
+    def clean_caption_text(text):
         if not text:
             return text
 
         words = text.split()
-        if len(words) <= 3:  # Too short to have repetition
+        if len(words) <= 3:
             return text
 
-        # Look for repeating patterns
         clean_words = []
         i = 0
         seen_patterns = set()
 
         while i < len(words):
-            current_pattern = []
             pattern_found = False
 
-            # Try different pattern lengths
             for pattern_length in range(2, min(8, len(words) - i)):
                 potential_pattern = tuple(words[i:i + pattern_length])
 
-                # Check if this pattern repeats immediately after
                 if (i + pattern_length * 2) <= len(words):
                     next_segment = tuple(
                         words[i + pattern_length:i + pattern_length * 2])
@@ -71,15 +61,12 @@ class CaptionEnhance:
         return " ".join(clean_words)
 
     @staticmethod
-    def enhance_caption(caption: str) -> str:
-        """Add dynamic context to the caption"""
+    def enhance_caption(caption):
         if not caption:
             return caption
 
-        # Clean the caption text first
         cleaned_caption = CaptionEnhance.clean_caption_text(caption)
 
-        # Check if it already has an intro phrase
         lower_caption = cleaned_caption.lower()
         for phrase in CaptionEnhance.INTRO_PHRASES:
             if lower_caption.startswith(phrase.lower()):
@@ -88,31 +75,23 @@ class CaptionEnhance:
         return f"{CaptionEnhance.get_random_intro()} {cleaned_caption}"
 
     @staticmethod
-    def enhance_dense_captions(dense_captions: list) -> list:
-        """Enhance only the top 2 dense captions with highest confidence scores"""
+    def enhance_dense_captions(dense_captions):
         if not dense_captions:
             return []
 
-        # Sort dense_captions by confidence in descending order
         sorted_captions = sorted(
             dense_captions,
             key=lambda x: x['confidence'] if x['confidence'] is not None else -1,
             reverse=True
         )
 
-        # Create a new list with enhanced captions
         enhanced = []
         for i, caption in enumerate(sorted_captions):
-            # Clean the caption text first
             cleaned_text = CaptionEnhance.clean_caption_text(caption['text'])
 
-            if i < 2:  # Only enhance the top 2 captions
-                # Check if it already has an intro phrase
-                has_intro = any(
-                    cleaned_text.lower().startswith(phrase.lower())
-                    for phrase in CaptionEnhance.INTRO_PHRASES
-                )
-
+            if i < 2:
+                has_intro = any(cleaned_text.lower().startswith(
+                    phrase.lower()) for phrase in CaptionEnhance.INTRO_PHRASES)
                 if not has_intro:
                     cleaned_text = f"{CaptionEnhance.get_random_intro()} {
                         cleaned_text}"
@@ -124,8 +103,7 @@ class CaptionEnhance:
 
         return enhanced
 
-    def enhance_response(self, response: dict) -> dict:
-        """Enhance the complete vision API response"""
+    def enhance_response(self, response):
         enhanced_response = response.copy()
 
         if 'caption' in enhanced_response:
