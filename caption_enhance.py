@@ -72,7 +72,7 @@ class CaptionEnhance:
             if lower_caption.startswith(phrase.lower()):
                 return cleaned_caption
 
-        return f"{CaptionEnhance.get_random_intro()} {cleaned_caption}"
+        return CaptionEnhance.get_random_intro() + " " + cleaned_caption
 
     @staticmethod
     def enhance_dense_captions(dense_captions):
@@ -93,8 +93,7 @@ class CaptionEnhance:
                 has_intro = any(cleaned_text.lower().startswith(
                     phrase.lower()) for phrase in CaptionEnhance.INTRO_PHRASES)
                 if not has_intro:
-                    cleaned_text = f"{CaptionEnhance.get_random_intro()} {
-                        cleaned_text}"
+                    cleaned_text = CaptionEnhance.get_random_intro() + " " + cleaned_text
 
             enhanced.append({
                 "text": cleaned_text,
