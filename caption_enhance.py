@@ -1,6 +1,7 @@
+from random import choice
+
 # The CaptionEnhance class is designed to enhance the output from Azure's Computer Vision API by adding more context and descriptive elements
 # to the generated captions. It processes both the main caption and dense captions to make them more verbose and user-friendly.
-from random import choice
 
 
 class CaptionEnhance:
