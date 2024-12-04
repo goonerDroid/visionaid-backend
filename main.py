@@ -38,6 +38,9 @@ STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 VISION_ENDPOINT = os.getenv("VISION_ENDPOINT")
 VISION_KEY = os.getenv("VISION_KEY")
 
+# Get port from environment variable
+PORT = int(os.getenv("PORT", 10000))
+
 # Validate environment variables
 if not VISION_ENDPOINT or not VISION_KEY or not STORAGE_CONNECTION_STRING:
     error_message = "Missing environment variables:\n"
@@ -186,4 +189,4 @@ async def analyze_image(file: UploadFile = File(...)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
